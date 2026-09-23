@@ -17,6 +17,10 @@ export class ApiError extends Error {
   }
 }
 
+export function isStaticDemo(): boolean {
+  return document.documentElement.dataset.staticDemo === "true";
+}
+
 function invalid(path: string): never { throw new ApiError("INVALID_RESPONSE", `服务返回的数据不完整：${path}。请刷新以重新读取；你的未保存文字仍保留在此浏览器。`, 502); }
 export function object(value: JsonValue | undefined, path: string): JsonObject {
   if (typeof value !== "object" || value === null || Array.isArray(value)) return invalid(path);
@@ -179,8 +183,16 @@ export function exportResult(value: JsonValue): ExportResponse {
 export async function request(path: string, method: "GET" | "POST" | "PATCH", body: string | null): Promise<JsonValue> {
   let response: Response;
   try {
-    response = await fetch(path, { method, headers: { "Content-Type": "application/json" }, ...(body === null ? {} : { body }) });
+    if (isStaticDemo()) {
+      if (method !== "GET" || path !== "/api/state") {
+        throw new ApiError("STATIC_DEMO_READ_ONLY", "这是静态演示版：只使用内置合成数据，不连接云端，也不会保存或执行更改。", 405);
+      }
+      response = await fetch(new URL("demo-state.json", document.baseURI), { method: "GET", cache: "no-store" });
+    } else {
+      response = await fetch(path, { method, headers: { "Content-Type": "application/json" }, ...(body === null ? {} : { body }) });
+    }
   } catch (error) {
+    if (error instanceof ApiError) throw error;
     if (error instanceof TypeError) throw new ApiError("NETWORK_UNAVAILABLE", `${method} ${path} 无法连接。请检查服务与网络后重试；未保存文字已保留。`, 0);
     throw error;
   }

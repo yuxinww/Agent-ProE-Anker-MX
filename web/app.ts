@@ -10,7 +10,7 @@ import { assistantView as assistantV4View, initialAssistantUiState } from "./ass
 import type { AssistantUiState } from "./assistant.js";
 import { memoryModuleView, todayModuleView } from "./modules.js";
 import type { MemoryModulePage, ModuleOptions, TodayModulePage } from "./modules.js";
-import { ApiError, array, assistantOperation, exportPlan, exportResult, object, preparation, request, snapshot, string } from "./api.js";
+import { ApiError, array, assistantOperation, exportPlan, exportResult, isStaticDemo, object, preparation, request, snapshot, string } from "./api.js";
 import type { JsonValue } from "./api.js";
 
 type Tab = "today" | "memory" | "assistant" | "profile";
@@ -257,6 +257,7 @@ function assistantView(): string {
 function profileView(): string {
   const snapshotValue: H5Snapshot | null = state.snapshot;
   if (snapshotValue === null) return "";
+  if (isStaticDemo()) return `${pageHeader("演示说明", "静态原型 · 不连接服务端")}<div class="profile-layout"><section class="profile-card"><span class="profile-avatar">${icon("user", "")}</span><h2>Mixture X 静态演示</h2><p>仅展示合成示例数据，不包含你的个人记录。</p><div class="profile-counts"><div><strong>${activeRecords().length}</strong><span>条示例</span></div><div><strong>${state.snapshot?.matters.length ?? 0}</strong><span>个事项</span></div><div><strong>0</strong><span>云端保存</span></div></div></section><section class="mode-details"><h2>演示版的边界</h2><p>此页面由 GitHub Pages 静态托管。数据随站点文件发布，不连接 API、数据库或云端存储。</p><ul><li>所有记录和人物均为合成示例。</li><li>搜索、筛选、页面跳转等仅影响当前视图。</li><li>添加、保存、助手执行和导出功能不会写入或运行；刷新页面会恢复演示状态。</li><li>场景图片为示意图，录音没有真实音频。</li></ul></section></div>`;
   return `${pageHeader("我的", "属于你的记录空间")}<div class="profile-layout"><section class="profile-card"><span class="profile-avatar">${icon("user", "")}</span><h2>${snapshotValue.mode === "hosted-private" ? "我的记录空间" : "我的本地空间"}</h2><p>慢慢记录，随时回来。</p><div class="profile-counts"><div><strong>${activeRecords().length}</strong><span>条记录</span></div><div><strong>${latestArtifacts().length}</strong><span>份准备稿</span></div><div><strong>${snapshotValue.exports.length}</strong><span>次导出</span></div></div></section><section class="mode-details"><h2>这个体验空间如何工作</h2><p>你添加的文字记录、保存的版本和导出回执保存在${snapshotValue.mode === "hosted-private" ? "此站点的云端空间" : "本地服务"}中。未保存的编辑暂存在当前浏览器会话，刷新前会提醒你。</p><ul><li>标注“示例记录”的内容用于体验流程，场景插画不是现场照片。</li><li>示例事项的时间与参与人是预设背景，请自行核对。</li><li>准备稿由规则整理已有文字，可编辑并查看来源。当前未接入在线模型、录音转写或外部日历。</li><li>导出仅生成供你下载的 Word 文件；不会发送给其他人。</li></ul><div class="local-status"><span></span>${snapshotValue.mode === "hosted-private" ? "个人云端体验" : "本地体验模式"}${button("重新读取", "refresh", "text-button", 'data-testid="refresh-state"')}</div></section></div><section class="receipt-section"><div class="section-heading"><h2>导出记录</h2><span>${snapshotValue.exports.length} 次</span></div>${snapshotValue.exports.length === 0 ? `<div class="empty-state compact">${icon("download", "")}<h3>还没有导出记录</h3><p>在助手中准备并核对一份稿件后，即可确认导出。</p></div>` : snapshotValue.exports.map((receipt) => `<article class="receipt">${icon("check-circle-2", "")}<span><strong>${escape(receipt.filename)}</strong><small>版本 ${receipt.artifactVersion} · ${dateText(receipt.verifiedAt, "full")} · ${receipt.byteLength.toLocaleString()} 字节</small></span>${receiptDownload(receipt, "secondary-button", `receipt-download-${receipt.operationId}`, "下载")}</article>`).join("")}</section>`;
 }
 
@@ -271,7 +272,8 @@ function render(): void {
   const subpage: boolean = (state.tab === "today" && state.todayPage !== "home") || (state.tab === "memory" && state.memoryPage !== "home");
   const view: string = state.snapshot === null ? `<section class="initial-state"><h1>记录暂时没有读进来</h1><p>请检查服务状态，再重新读取。</p>${button("重新读取", "refresh", "primary-button", 'data-testid="retry-load"')}</section>` : state.tab === "today" ? todayModuleView(state.snapshot, moduleOptions) : state.tab === "memory" ? memoryModuleView(state.snapshot, moduleOptions) : state.tab === "assistant" ? assistantView() : profileView();
   element("app").classList.toggle("module-subpage", subpage);
-  element("app").innerHTML = `${subpage ? "" : navigation()}<main id="main-content" class="main-content" tabindex="-1"><div id="message-host"></div>${view}<footer class="app-footer"><span>Mixture X</span><span>记录留在这里，下一步由你决定。</span></footer></main>`;
+  const demoBanner = isStaticDemo() ? `<aside class="static-demo-banner" role="note">静态演示 · 合成数据 · 不会保存到云端</aside>` : "";
+  element("app").innerHTML = `${demoBanner}${subpage ? "" : navigation()}<main id="main-content" class="main-content" tabindex="-1"><div id="message-host"></div>${view}<footer class="app-footer"><span>Mixture X</span><span>记录留在这里，下一步由你决定。</span></footer></main>`;
   document.title = `Mixture X · ${tabs.find((tab) => tab.id === state.tab)?.label ?? "今天"}`;
   renderMessages();
   updateBusy();
@@ -357,7 +359,7 @@ async function perform(name: string, operation: () => Promise<void>): Promise<vo
   } finally { state.busy = null; updateBusy(); }
 }
 async function refreshState(): Promise<void> {
-  await perform("refresh", async () => { setSnapshot(snapshot(await request("/api/state", "GET", null))); render(); state.notice = "已读取最新记录，未保存的文字仍保留。"; renderMessages(); announce(state.notice); });
+  await perform("refresh", async () => { setSnapshot(snapshot(await request("/api/state", "GET", null))); render(); state.notice = isStaticDemo() ? "已重新载入内置演示数据，没有内容写入服务端。" : "已读取最新记录，未保存的文字仍保留。"; renderMessages(); announce(state.notice); });
 }
 function switchTab(tab: Tab): void {
   if (state.tab === tab) return;
@@ -1095,7 +1097,7 @@ document.addEventListener("keydown", (event: KeyboardEvent) => {
   if (event.shiftKey && (document.activeElement === first || document.activeElement?.classList.contains("modal"))) { event.preventDefault(); last?.focus(); }
   else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first?.focus(); }
 });
-window.addEventListener("beforeunload", (event: BeforeUnloadEvent) => { if (hasDirty()) { event.preventDefault(); event.returnValue = ""; } });
+window.addEventListener("beforeunload", (event: BeforeUnloadEvent) => { if (!isStaticDemo() && hasDirty()) { event.preventDefault(); event.returnValue = ""; } });
 
 async function start(): Promise<void> {
   try { restoreDrafts(); }

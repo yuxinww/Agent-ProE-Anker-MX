@@ -37,7 +37,8 @@ async function main() {
   page.on("response", response => { if (response.status() >= 400) httpErrors.push(`${response.status()} ${response.url()}`); });
   try {
     const response = await page.goto(url, { waitUntil: "networkidle", timeout: 30000 });
-    const appFrame = new URL(url).pathname === "/_preview/iphone"
+    const hasPhoneFrame = await page.locator("iframe.iphone-screen").count() > 0;
+    const appFrame = hasPhoneFrame
       ? page.frames().find(frame => frame !== page.mainFrame())
       : null;
     if (tab !== "none") {
@@ -70,7 +71,7 @@ async function main() {
     let assistantScreen = await page.locator("[data-assistant-screen]").first().getAttribute("data-assistant-screen").catch(() => null);
     let assistantComposerLayout = null;
     let scrollCheck = null;
-    if (assistantScreen === null && new URL(url).pathname === "/_preview/iphone") {
+    if (assistantScreen === null && appFrame) {
       const frame = appFrame ?? page.frames().find(candidate => candidate !== page.mainFrame());
       if (frame) {
         assistantScreen = await frame.locator("[data-assistant-screen]").first().getAttribute("data-assistant-screen").catch(() => null);
