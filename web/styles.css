@@ -21,7 +21,6 @@ html{background:#eeebe4;scrollbar-gutter:auto}
 *::-webkit-scrollbar{display:none;width:0;height:0}
 body{background:#eeebe4;min-height:100dvh}
 #app{width:100%;max-width:430px;min-height:100dvh;margin:0 auto;background:var(--canvas);display:block;border:0;box-shadow:0 0 0 1px #e5e0d7}
-.static-demo-banner{position:sticky;top:0;z-index:30;width:min(430px,100%);margin:0 auto;padding:34px 12px 7px;background:#6d735b;color:#fff;text-align:center;font-size:10px;letter-spacing:.03em}
 .main-content{width:100%;max-width:none;padding:24px 20px calc(90px + env(safe-area-inset-bottom))}
 .sidebar{inset:auto auto 0 50%;transform:translateX(-50%);width:min(100%,430px);padding:0 10px calc(7px + env(safe-area-inset-bottom));height:auto;background:#fdfaf3f7;border-top:1px solid var(--line);border-right:0;backdrop-filter:blur(15px)}
 .main-nav{display:flex;margin:0;gap:0;justify-content:space-around}

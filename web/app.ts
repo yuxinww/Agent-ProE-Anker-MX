@@ -272,8 +272,7 @@ function render(): void {
   const subpage: boolean = (state.tab === "today" && state.todayPage !== "home") || (state.tab === "memory" && state.memoryPage !== "home");
   const view: string = state.snapshot === null ? `<section class="initial-state"><h1>记录暂时没有读进来</h1><p>请检查服务状态，再重新读取。</p>${button("重新读取", "refresh", "primary-button", 'data-testid="retry-load"')}</section>` : state.tab === "today" ? todayModuleView(state.snapshot, moduleOptions) : state.tab === "memory" ? memoryModuleView(state.snapshot, moduleOptions) : state.tab === "assistant" ? assistantView() : profileView();
   element("app").classList.toggle("module-subpage", subpage);
-  const demoBanner = isStaticDemo() ? `<aside class="static-demo-banner" role="note">静态演示 · 合成数据 · 不会保存到云端</aside>` : "";
-  element("app").innerHTML = `${demoBanner}${subpage ? "" : navigation()}<main id="main-content" class="main-content" tabindex="-1"><div id="message-host"></div>${view}<footer class="app-footer"><span>Mixture X</span><span>记录留在这里，下一步由你决定。</span></footer></main>`;
+  element("app").innerHTML = `${subpage ? "" : navigation()}<main id="main-content" class="main-content" tabindex="-1"><div id="message-host"></div>${view}<footer class="app-footer"><span>Mixture X</span><span>记录留在这里，下一步由你决定。</span></footer></main>`;
   document.title = `Mixture X · ${tabs.find((tab) => tab.id === state.tab)?.label ?? "今天"}`;
   renderMessages();
   updateBusy();
@@ -1109,7 +1108,7 @@ async function start(): Promise<void> {
   else { state.notice = ""; renderMessages(); }
 }
 async function refreshInBackground(): Promise<void> {
-  if (document.visibilityState !== "visible" || state.busy !== null || state.snapshot === null) return;
+  if (isStaticDemo() || document.visibilityState !== "visible" || state.busy !== null || state.snapshot === null) return;
   try {
     const updated: H5Snapshot = snapshot(await request("/api/state", "GET", null));
     if (state.busy !== null) return;
